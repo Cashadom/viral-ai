@@ -93,10 +93,15 @@ export default function HistoryPage() {
     if (!loading && !user) router.push('/login')
   }, [user, loading, router])
 
+  // ✅ CORRIGÉ : Vérification explicite de user avant d'utiliser user.uid
   useEffect(() => {
-    if (!user) return
-
     async function load() {
+      // Sort immédiatement si user n'existe pas
+      if (!user) {
+        setFetching(false)
+        return
+      }
+
       const q = query(
         collection(db, 'users', user.uid, 'generations'),
         orderBy('createdAt', 'desc')
@@ -108,6 +113,7 @@ export default function HistoryPage() {
       if (docs.length > 0) setSelected(docs[0])
       setFetching(false)
     }
+
     load()
   }, [user])
 
