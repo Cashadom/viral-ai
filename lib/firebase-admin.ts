@@ -17,6 +17,15 @@ export const adminDb = getFirestore(app)
 
 const FREE_LIMIT = 3
 
+export interface AdminUserDoc {
+  id: string
+  email?: string
+  stripeCustomerId?: string
+  plan?: 'free' | 'premium'
+  generationsToday?: number
+  [key: string]: unknown
+}
+
 export async function getUserQuota(uid: string) {
   try {
     const userRef = adminDb.collection('users').doc(uid)
@@ -26,13 +35,13 @@ export async function getUserQuota(uid: string) {
       return { allowed: false, remaining: 0, plan: 'free' as const }
     }
 
-    const user = userSnap.data()
+    const user = userSnap.data() as Partial<AdminUserDoc> | undefined
 
     if (user?.plan === 'premium') {
       return { allowed: true, remaining: Infinity, plan: 'premium' as const }
     }
 
-    const used = user?.generationsToday || 0
+    const used = typeof user?.generationsToday === 'number' ? user.generationsToday : 0
     const allowed = used < FREE_LIMIT
     const remaining = Math.max(0, FREE_LIMIT - used)
 
@@ -43,7 +52,7 @@ export async function getUserQuota(uid: string) {
   }
 }
 
-export async function getUserDoc(uid: string) {
+export async function getUserDoc(uid: string): Promise<AdminUserDoc | null> {
   try {
     const userRef = adminDb.collection('users').doc(uid)
     const userSnap = await userRef.get()
@@ -52,9 +61,11 @@ export async function getUserDoc(uid: string) {
       return null
     }
 
+    const data = userSnap.data() as Omit<AdminUserDoc, 'id'> | undefined
+
     return {
       id: userSnap.id,
-      ...userSnap.data(),
+      ...(data ?? {}),
     }
   } catch (error) {
     console.error('getUserDoc error:', error)
