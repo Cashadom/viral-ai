@@ -85,7 +85,6 @@ export default function HistoryPage() {
       toast.success('Ajouté aux favoris ⭐')
     }
     setFavorites(newFavorites)
-    // ✅ CORRIGÉ : Array.from() au lieu de spread operator
     localStorage.setItem('historyFavorites', JSON.stringify(Array.from(newFavorites)))
   }
 
@@ -93,7 +92,7 @@ export default function HistoryPage() {
     if (!loading && !user) router.push('/login')
   }, [user, loading, router])
 
-  // ✅ CORRIGÉ : Vérification explicite de user avant d'utiliser user.uid
+  // ✅ CORRECTION FINALE : extraction de uid pour éviter les warnings TypeScript
   useEffect(() => {
     async function load() {
       // Sort immédiatement si user n'existe pas
@@ -102,8 +101,11 @@ export default function HistoryPage() {
         return
       }
 
+      // 🔥 FIX : extraire uid une fois pour figer le type
+      const uid = user.uid
+
       const q = query(
-        collection(db, 'users', user.uid, 'generations'),
+        collection(db, 'users', uid, 'generations'),
         orderBy('createdAt', 'desc')
       )
       const snap = await getDocs(q)
@@ -151,7 +153,7 @@ export default function HistoryPage() {
   }
 
   // Récupérer les niches uniques pour le filtre
-  const uniqueNiches = [...new Set(generations.map((g) => g.niche))]
+  const uniqueNiches = Array.from(new Set(generations.map((g) => g.niche)))
 
   // Réutiliser une génération (redirige vers dashboard avec préremplissage)
   const handleReuse = (gen: Generation) => {
