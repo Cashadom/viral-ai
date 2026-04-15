@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { adminDb } from '@/lib/firebase-admin'
-import { headers } from 'next/headers'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-02-24.acacia',
+  apiVersion: '2024-04-10',
 })
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
 
 export async function POST(req: NextRequest) {
   const body = await req.text()
-  const signature = headers().get('stripe-signature')
+  const signature = req.headers.get('stripe-signature')
 
   if (!signature) {
     return NextResponse.json({ error: 'Missing signature' }, { status: 400 })
@@ -32,7 +31,10 @@ export async function POST(req: NextRequest) {
         const session = event.data.object as Stripe.Checkout.Session
         const userId = session.client_reference_id
         const customerId = session.customer as string
-        const email = session.customer_details?.email || session.customer_email || null
+        const email =
+          session.customer_details?.email ||
+          session.customer_email ||
+          null
 
         console.log('Webhook checkout.session.completed reçu', {
           userId,
@@ -77,7 +79,9 @@ export async function POST(req: NextRequest) {
               { merge: true }
             )
 
-            console.log(`✅ User ${userDoc.id} upgraded to premium via email fallback (${email})`)
+            console.log(
+              `✅ User ${userDoc.id} upgraded to premium via email fallback (${email})`
+            )
           } else {
             console.warn(`⚠️ Aucun utilisateur trouvé pour l'email Stripe: ${email}`)
           }
@@ -111,6 +115,7 @@ export async function POST(req: NextRequest) {
             },
             { merge: true }
           )
+
           console.log(`⬇️ User ${userDoc.id} downgraded to free`)
         }
 
