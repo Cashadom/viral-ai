@@ -42,3 +42,22 @@ export async function getUserQuota(uid: string) {
     return { allowed: false, remaining: 0, plan: 'free' as const }
   }
 }
+
+export async function getUserDoc(uid: string) {
+  try {
+    const userRef = adminDb.collection('users').doc(uid)
+    const userSnap = await userRef.get()
+
+    if (!userSnap.exists) {
+      return null
+    }
+
+    return {
+      id: userSnap.id,
+      ...userSnap.data(),
+    }
+  } catch (error) {
+    console.error('getUserDoc error:', error)
+    return null
+  }
+}
