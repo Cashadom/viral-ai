@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { collection, getDocs, orderBy, query, limit } from 'firebase/firestore'
+import { collection, getDocs, orderBy, query } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuth } from '@/hooks/useAuth'
 import toast from 'react-hot-toast'
@@ -63,7 +63,14 @@ export default function HistoryPage() {
   useEffect(() => {
     const saved = localStorage.getItem('historyFavorites')
     if (saved) {
-      setFavorites(new Set(JSON.parse(saved)))
+      try {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed)) {
+          setFavorites(new Set(parsed))
+        }
+      } catch (e) {
+        console.error('Failed to parse favorites:', e)
+      }
     }
   }, [])
 
@@ -78,7 +85,8 @@ export default function HistoryPage() {
       toast.success('Ajouté aux favoris ⭐')
     }
     setFavorites(newFavorites)
-    localStorage.setItem('historyFavorites', JSON.stringify([...newFavorites]))
+    // ✅ CORRIGÉ : Array.from() au lieu de spread operator
+    localStorage.setItem('historyFavorites', JSON.stringify(Array.from(newFavorites)))
   }
 
   useEffect(() => {
