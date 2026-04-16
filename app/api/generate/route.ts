@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
-import { getUserQuota, adminAuth } from '@/lib/firebase-admin'
+import { getUserQuota, adminAuth, adminDb } from '@/lib/firebase-admin'
 import { headers } from 'next/headers'
 
 export const runtime = 'nodejs'
@@ -46,7 +46,7 @@ type GenerateResponse = {
   winningPatterns?: string
   marketInsights?: string
   contentAngles?: string
-  nextPostPlan?: string | object // ← MODIFIÉ pour accepter string ou objet
+  nextPostPlan?: string | object
   storyboard?: StoryboardFrame[]
   videosAnalyzed?: Array<{
     title?: string
@@ -84,14 +84,9 @@ function safeJsonParse<T>(text: string): T | null {
   }
 }
 
-// ✅ NOUVELLE FONCTION : formate nextPostPlan en string
 function formatNextPostPlan(nextPostPlan: unknown): string {
   if (!nextPostPlan) return ''
-
-  // Si c'est déjà une string, on la retourne
   if (typeof nextPostPlan === 'string') return nextPostPlan
-
-  // Si c'est un objet, on le transforme en texte lisible
   if (typeof nextPostPlan === 'object' && nextPostPlan !== null) {
     const plan = nextPostPlan as {
       sujet?: string
@@ -103,7 +98,6 @@ function formatNextPostPlan(nextPostPlan: unknown): string {
       CTAfinal?: string
       pourquoiMarche?: string
     }
-
     const lines = [
       plan.sujet && `📌 Sujet : ${plan.sujet}`,
       plan.angle && `🎯 Angle : ${plan.angle}`,
@@ -114,11 +108,8 @@ function formatNextPostPlan(nextPostPlan: unknown): string {
       plan.CTAfinal && `⚡ CTA final : ${plan.CTAfinal}`,
       plan.pourquoiMarche && `🔍 Pourquoi ça marche : ${plan.pourquoiMarche}`,
     ].filter(Boolean)
-
     return lines.join('\n\n')
   }
-
-  // Fallback : conversion JSON
   try {
     return JSON.stringify(nextPostPlan, null, 2)
   } catch {
@@ -142,7 +133,7 @@ function sanitizeGenerateResponse(
     winningPatterns: parsed?.winningPatterns || '',
     marketInsights: parsed?.marketInsights || '',
     contentAngles: parsed?.contentAngles || '',
-    nextPostPlan: formatNextPostPlan(parsed?.nextPostPlan), // ✅ CORRIGÉ
+    nextPostPlan: formatNextPostPlan(parsed?.nextPostPlan),
     storyboard: includeAdvancedAnalysis && Array.isArray(parsed?.storyboard)
       ? parsed.storyboard.slice(0, 9).map((frame) => ({
           step: frame?.step || '',
@@ -459,6 +450,17 @@ ${advancedBlock}`,
         },
         { status: 500 }
       )
+    }
+
+    // ✅ INC RÉMENTATION DU COMPTEUR (après génération réussie)
+    // Seulement pour le mode generate (pas pour improve)
+    if (mode === 'generate') {
+      const FieldValue = require('firebase-admin').firestore.FieldValue
+      await adminDb.collection('users').doc(uid).update({
+        generationsToday: FieldValue.increment(1),
+        lastGenerationDate: new Date().toDateString(),
+      })
+      console.log(`✅ Compteur incrémenté pour ${uid}`)
     }
 
     return NextResponse.json(
